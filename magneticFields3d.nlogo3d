@@ -1,3 +1,5 @@
+extensions [table]
+
 breed [vectors vector]
 breed [bots bot]
 
@@ -5,12 +7,15 @@ bots-own [
 
 ]
 
+
+
 ; These values will represent the vectors on each patch
 patches-own [
   amplitude
   theta
   phi
 ]
+
 
 vectors-own [
 
@@ -37,6 +42,7 @@ to-report x-component
   let y pycor
   let z pzcor
   let t ticks
+
 
   ; Give the x component of the vector equation here
   report -1 * x
@@ -67,9 +73,16 @@ end
 ; ******************************************************************************************
 ; ******************************************************************************************
 
+
+to resize
+  resize-world minimum-x-coordinate maximum-x-coordinate minimum-y-coordinate maximum-y-coordinate minimum-z-coordinate maximum-z-coordinate
+end
+
+
 ; Will prepare the environment, run by the setup button in the interface
 to setup
   clear-all
+  ;setup-patches-og
   create-bots Microbots [bot-setup]
   reset-ticks
 end
@@ -81,7 +94,7 @@ to go
   clear-drawing
   setup-patches
   if (show-vectors?) [ ; can be turned on and off by flicking the switch of the same name in the interface
-    create-vectors 512 [vector-setup] ; This amount (512) seems to be a good balance between showing everything and speed.
+    create-vectors (num-vec-per-dimension * num-vec-per-dimension * num-vec-per-dimension) [vector-setup] ; This amount (512) seems to be a good balance between showing everything and speed.
   ]                                   ; Works in accordance with spacing rules in vector-setup, please do not change unless you change that too.
   move-bots
   tick
@@ -94,6 +107,14 @@ to setup-patches
     set amplitude pAmp
     set theta pTheta
     set phi pPhi
+  ]
+end
+
+to setup-patches-og
+  ask patches [
+    if (pzcor = 0)[
+      set pcolor red
+    ]
   ]
 end
 
@@ -113,8 +134,8 @@ end
 
 
 ; Will draw the vectors
-to vector-setup ; If you wish to change the numbers above, please accordingly change the spacing here with the mod commands.
-  move-to one-of patches with [not any? other vectors-here and (pxcor mod 4 = 0 and pycor mod 4 = 0 and pzcor mod 4 = 0)]
+to vector-setup
+  move-to one-of patches with [not any? other vectors-here and (pxcor mod vec-pos-scale-x = 0 and pycor mod vec-pos-scale-y = 0 and pzcor mod vec-pos-scale-z = 0)]
   ask patch xcor ycor zcor [
     set amp amplitude
     set head theta
@@ -195,15 +216,24 @@ to-report pPhi
   ]
 end
 
+to-report vec-pos-scale-x
+  report (maximum-x-coordinate - minimum-x-coordinate) / num-vec-per-dimension
+end
 
+to-report vec-pos-scale-y
+  report (maximum-y-coordinate - minimum-y-coordinate) / num-vec-per-dimension
+end
 
+to-report vec-pos-scale-z
+  report (maximum-z-coordinate - minimum-z-coordinate) / num-vec-per-dimension
+end
 
 @#$#@#$#@
 GRAPHICS-WINDOW
 0
 0
-439
-460
+541
+542
 -1
 -1
 13.0
@@ -216,12 +246,12 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
--16
-16
+-20
+20
+-20
+20
+-20
+20
 1
 0
 1
@@ -229,10 +259,10 @@ ticks
 30.0
 
 BUTTON
-68
-46
-131
-79
+102
+48
+165
+81
 NIL
 setup\n
 NIL
@@ -263,10 +293,10 @@ NIL
 1
 
 BUTTON
-129
-102
-192
-135
+140
+91
+203
+124
 NIL
 go
 T
@@ -280,30 +310,162 @@ NIL
 1
 
 SLIDER
-354
-93
-526
-126
+304
+47
+476
+80
 Microbots
 Microbots
 1
 100
-1.0
+6.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-254
-174
-390
-207
+324
+93
+460
+126
 show-vectors?
 show-vectors?
 0
 1
 -1000
+
+BUTTON
+215
+145
+319
+178
+Resize-World
+resize
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+153
+194
+371
+227
+minimum-x-coordinate
+minimum-x-coordinate
+-50
+0
+-20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+153
+233
+376
+266
+maximum-x-coordinate
+maximum-x-coordinate
+0
+50
+20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+429
+192
+647
+225
+minimum-y-coordinate
+minimum-y-coordinate
+-50
+0
+-20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+430
+236
+653
+269
+maximum-y-coordinate
+maximum-y-coordinate
+0
+50
+20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+153
+305
+368
+338
+minimum-z-coordinate
+minimum-z-coordinate
+-50
+0
+-20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+153
+348
+374
+381
+maximum-z-coordinate
+maximum-z-coordinate
+0
+50
+20.0
+1
+1
+patches
+HORIZONTAL
+
+SLIDER
+480
+92
+652
+125
+num-vec-per-dimension
+num-vec-per-dimension
+3
+15
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+482
+132
+632
+174
+Should share divisors with the difference between each min and max coordinate
+11
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
