@@ -1,5 +1,3 @@
-extensions [table]
-
 breed [vectors vector]
 breed [bots bot]
 
@@ -14,6 +12,7 @@ patches-own [
   amplitude
   theta
   phi
+  free
 ]
 
 
@@ -36,7 +35,10 @@ globals [
 
 
 ; Give the vector equation in the next three functions, first for the x component, then the
-; y component then the z component. Do so in terms of x, y, z, and t (time)
+; y component then the z component. Do so in terms of x, y, z, and t (time). By default set to f(x,y,z) = [-x, -y, -z]
+
+
+; NOTE: ONLY USE WHEN multiple-sections? SWITCHED OFF
 to-report x-component
   let x pxcor
   let y pycor
@@ -68,6 +70,75 @@ to-report z-component
   report -1 * z
 end
 
+
+; The following three functions are for if you have multiple sections switched on.
+; To use, you can add as many elif statements as you like by adding conditions brackets "()"
+; before square brackets "[]". The example default provided shows a vector field that follows
+; f[x,y,z] = [-x,-y,-z] for x < 0, f[x,y,z] = [1,0,0] for x = 0, and f[x,y,z] = [x, y, z] for x > 0
+
+; NOTE: ONLY USE WHEN multiple-sections? IS SWITCHED ON
+
+to-report x-component-ms
+  let x pxcor
+  let y pycor
+  let z pzcor
+  let t ticks
+
+  (ifelse (x > 0)[
+    report x
+  ](x = 0)[
+    report 1
+  ][
+    report -1 * x;
+  ])
+end
+
+to-report y-component-ms
+  let x pxcor
+  let y pycor
+  let z pzcor
+  let t ticks
+
+  (ifelse (x > 0)[
+    report 0
+  ](x = 0)[
+    report 0
+  ][
+    report -1 * y;
+  ])
+end
+
+to-report z-component-ms
+  let x pxcor
+  let y pycor
+  let z pzcor
+  let t ticks
+
+  (ifelse (x > 0)[
+    report 0
+  ](x = 0)[
+    report 0
+  ][
+    report -1 * z;
+  ])
+end
+
+; The following function is for you to represent free space. Represent regions in the same way you would for the multiple-sections code
+; But instead of reporting set the value free to either true (if should be free space) or false (if should not be free space)
+
+to free-space
+  let x pxcor
+  let y pycor
+  let z pzcor
+
+  (ifelse (x < 0)[
+    set free true
+  ][
+    set free false
+  ])
+
+end
+
 ; Please do not change code below
 
 ; ******************************************************************************************
@@ -82,32 +153,52 @@ end
 ; Will prepare the environment, run by the setup button in the interface
 to setup
   clear-all
-  ;setup-patches-og
-  create-bots Microbots [bot-setup]
   reset-ticks
+  if (static-vectors?)[
+    setup-patches
+    if (show-vectors?)[
+      create-vectors (num-vec-per-dimension * num-vec-per-dimension * num-vec-per-dimension) [vector-setup]
+    ]
+  ]
+  create-bots Microbots [bot-setup]
+
 end
 
 ; Will run a single tick (discrete time step) of the simulation.
 ; Run once with the button "go-once" and continuously by the button "go"
 to go
-  ask vectors [ die ]
-  clear-drawing
-  setup-patches
-  if (show-vectors?) [ ; can be turned on and off by flicking the switch of the same name in the interface
-    create-vectors (num-vec-per-dimension * num-vec-per-dimension * num-vec-per-dimension) [vector-setup] ; This amount (512) seems to be a good balance between showing everything and speed.
-  ]                                   ; Works in accordance with spacing rules in vector-setup, please do not change unless you change that too.
+  if (not static-vectors?)[
+    ask vectors [ die ]
+    clear-drawing
+    setup-patches
+    if (show-vectors?) [ ; can be turned on and off by flicking the switch of the same name in the interface
+      create-vectors (num-vec-per-dimension * num-vec-per-dimension * num-vec-per-dimension) [vector-setup]
+    ]
+  ]
   move-bots
+
   tick
 end
 
 ; Will find the vector information for each patch, ultimately uses the equations given by the
 ; user near the top of the program
 to setup-patches
-  ask patches [
-    set amplitude pAmp
-    set theta pTheta
-    set phi pPhi
+  ifelse (multiple-sections?)[
+    ask patches [
+      set amplitude pAmp-ms
+      set theta pTheta-ms
+      set phi pPhi-ms
+      free-space
+    ]
+  ][
+    ask patches [
+      set amplitude pAmp
+      set theta pTheta
+      set phi pPhi
+      free-space
+    ]
   ]
+
 end
 
 to setup-patches-og
@@ -126,9 +217,14 @@ to move-bots
       set head theta
       set pit phi
     ]
-    set heading head
-    set pitch pit
-    forward amp / 10
+    ifelse (about-to-wrap)[
+      set heading head
+      set pitch pit
+    ][
+      set heading head
+      set pitch pit
+      forward amp / 10
+    ]
   ]
 end
 
@@ -141,13 +237,19 @@ to vector-setup
     set head theta
     set pit phi
   ]
-  let reference max [amplitude] of patches
-  let const (reference / 250)
-  set heading head
-  set pitch pit
-  set color whatColour const amp
-  pen-down
-  forward 1
+  ifelse (amp = 0)[
+    die
+  ][
+    let reference max [amplitude] of patches
+    let const (reference / 250)
+    set heading head
+    set pitch pit
+    set color whatColour const amp
+    if (not at-edge)[
+      pen-down
+      forward 1
+    ]
+  ]
 end
 
 ; Creates a relative colour scheme based on the strength of the vectors
@@ -173,9 +275,15 @@ end
 
 ; Just randomly places bots on the screen given the Microbots slider in the interface, called by the "setup" button
 to bot-setup
+  set size (bot-size / 100)
   set color blue
   set shape "square"
-  move-to one-of patches with [not any? other bots-here]
+  ifelse (Only-Spawn-Free-Space?)[
+    show 1
+    move-to one-of patches with [(not any? other bots-here) and free]
+  ][
+    move-to one-of patches with [not any? other bots-here]
+  ]
 end
 
 
@@ -190,6 +298,7 @@ to-report pAmp
   let z z-component
 
   report sqrt (x * x + y * y + z * z)
+
 end
 
 ; Finds the heading of the vectors at each patch
@@ -216,6 +325,40 @@ to-report pPhi
   ]
 end
 
+; Finds the amplitude of the vectors at each patch (multiple sections)
+to-report pAmp-ms
+  let x x-component-ms
+  let y y-component-ms
+  let z z-component-ms
+
+  report sqrt (x * x + y * y + z * z)
+
+end
+
+; Finds the heading of the vectors at each patch (multiple sections)
+to-report pTheta-ms
+  let x x-component-ms
+  let y y-component-ms
+
+  ifelse (x = 0 and y = 0)[
+    report 0;
+  ][
+    report atan x y
+  ]
+end
+
+; Finds the pitch of the vectors at each patch (multiple sections)
+to-report pPhi-ms
+  let x x-component-ms
+  let y y-component-ms
+  let z z-component-ms
+  ifelse (z = 0)[
+    report 0
+  ][
+    report atan z sqrt(x * x + y * y)
+  ]
+end
+
 to-report vec-pos-scale-x
   report (maximum-x-coordinate - minimum-x-coordinate) / num-vec-per-dimension
 end
@@ -228,12 +371,27 @@ to-report vec-pos-scale-z
   report (maximum-z-coordinate - minimum-z-coordinate) / num-vec-per-dimension
 end
 
+to-report at-edge
+  ifelse ((pxcor = minimum-x-coordinate) or (pxcor = maximum-x-coordinate) or (pycor = minimum-y-coordinate) or (pycor = maximum-y-coordinate) or (pzcor = minimum-z-coordinate) or (pzcor = maximum-z-coordinate))[
+    report true
+  ][
+    report false
+  ]
+end
+
+to-report about-to-wrap
+  ifelse ((at-edge) and (ticks > 0)) [
+    report true
+  ][
+    report false
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 0
 0
-541
-542
+437
+438
 -1
 -1
 13.0
@@ -246,12 +404,12 @@ GRAPHICS-WINDOW
 1
 1
 1
--20
-20
--20
-20
--20
-20
+-16
+16
+-16
+16
+-16
+16
 1
 0
 1
@@ -259,10 +417,10 @@ ticks
 30.0
 
 BUTTON
-102
-48
-165
-81
+45
+33
+136
+79
 NIL
 setup\n
 NIL
@@ -276,10 +434,10 @@ NIL
 1
 
 BUTTON
-183
-48
-260
-81
+154
+33
+250
+79
 go-once
 go
 NIL
@@ -292,54 +450,37 @@ NIL
 NIL
 1
 
-BUTTON
-140
-91
-203
-124
-NIL
-go
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 SLIDER
-304
-47
-476
-80
+294
+40
+466
+73
 Microbots
 Microbots
 1
 100
-6.0
+100.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-324
-93
-460
-126
+248
+176
+384
+209
 show-vectors?
 show-vectors?
-0
+1
 1
 -1000
 
 BUTTON
-215
-145
-319
-178
+153
+85
+252
+131
 Resize-World
 resize
 NIL
@@ -353,116 +494,251 @@ NIL
 1
 
 SLIDER
-153
-194
-371
-227
+69
+238
+287
+271
 minimum-x-coordinate
 minimum-x-coordinate
 -50
 0
--20.0
+-16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-153
-233
-376
-266
+67
+279
+290
+312
 maximum-x-coordinate
 maximum-x-coordinate
 0
 50
-20.0
+16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-429
-192
-647
-225
+309
+239
+527
+272
 minimum-y-coordinate
 minimum-y-coordinate
 -50
 0
--20.0
+-16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-430
-236
-653
-269
+309
+278
+532
+311
 maximum-y-coordinate
 maximum-y-coordinate
 0
 50
-20.0
+16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-153
-305
-368
-338
+555
+237
+770
+270
 minimum-z-coordinate
 minimum-z-coordinate
 -50
 0
--20.0
+-16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-153
-348
-374
-381
+553
+277
+774
+310
 maximum-z-coordinate
 maximum-z-coordinate
 0
 50
-20.0
+16.0
 1
 1
 patches
 HORIZONTAL
 
 SLIDER
-480
-92
-652
-125
+407
+175
+579
+208
 num-vec-per-dimension
 num-vec-per-dimension
 3
 15
-10.0
+8.0
 1
 1
 NIL
 HORIZONTAL
 
 TEXTBOX
-482
-132
-632
-174
+601
+172
+751
+214
 Should share divisors with the difference between each min and max coordinate
+11
+0.0
+1
+
+BUTTON
+45
+89
+139
+130
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+29
+166
+245
+250
+Do you want to to see the vectors of the vector field? (Note this will significantly slow down the simulation with non-static if you have static-vectors? switched off)
+11
+0.0
+1
+
+TEXTBOX
+486
+41
+636
+69
+How many microbots do you want to simulate?
+11
+0.0
+1
+
+SWITCH
+47
+389
+199
+422
+multiple-sections?
+multiple-sections?
+0
+1
+-1000
+
+TEXTBOX
+214
+386
+427
+456
+Switch on to write different vector-valued functions for different regions of the space. You will need to use different functions.
+11
+0.0
+1
+
+SWITCH
+46
+448
+184
+481
+static-vectors?
+static-vectors?
+0
+1
+-1000
+
+TEXTBOX
+214
+439
+578
+551
+Switch on if you do not intend to use time (ticks) in your vector valued function. While not essential, will massively speed up the simulation. May speed up to the point where you need to slow down the speed when running go. Please keep speed high when running setup though, as otherwise this can take a while (Can be done in 3D view).
+11
+0.0
+1
+
+SLIDER
+293
+90
+477
+123
+bot-size
+bot-size
+5
+100
+50.0
+1
+1
+% of patch size
+HORIZONTAL
+
+TEXTBOX
+494
+85
+664
+127
+How big do you want the microbots to be (as a percentage of patch size)?
+11
+0.0
+1
+
+TEXTBOX
+795
+245
+945
+287
+Adjust these to decide the dimensions of your world, then click on \"Resize-World\"
+11
+0.0
+1
+
+SWITCH
+718
+52
+914
+85
+Only-Spawn-Free-Space?
+Only-Spawn-Free-Space?
+0
+1
+-1000
+
+TEXTBOX
+931
+46
+1112
+102
+Set to \"on\" if you only want microbots to spawn in a space you have defined as \"free\" in the code
 11
 0.0
 1
