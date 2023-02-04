@@ -75,6 +75,9 @@ end
 ; To use, you can add as many elif statements as you like by adding conditions brackets "()"
 ; before square brackets "[]". The example default provided shows a vector field that follows
 ; f[x,y,z] = [-x,-y,-z] for x < 0, f[x,y,z] = [1,0,0] for x = 0, and f[x,y,z] = [x, y, z] for x > 0
+; To set a new origin in a region, use (x - origin-x-coordinate) where origin-x-coordinate is the x coordinate of
+; your desired origin in place of x. Do similar for y and z.
+
 
 ; NOTE: ONLY USE WHEN multiple-sections? IS SWITCHED ON
 
@@ -458,7 +461,7 @@ Microbots
 Microbots
 1
 100
-100.0
+5.0
 1
 1
 NIL
