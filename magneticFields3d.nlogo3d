@@ -279,7 +279,6 @@ to bot-setup
   set color blue
   set shape "square"
   ifelse (Only-Spawn-Free-Space?)[
-    show 1
     move-to one-of patches with [(not any? other bots-here) and free]
   ][
     move-to one-of patches with [not any? other bots-here]
